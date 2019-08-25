@@ -18,6 +18,7 @@
     "express": "^4.17.1",
     "js-yaml": "^3.13.1",
     "mx-puppet-bridge": "^0.0.11-1",
+    "oauth": "^0.9.15",
     "tslint": "^5.17.0",
     "twit": "^2.2.11",
     "twitter-webhooks": "^0.3.0",

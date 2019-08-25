@@ -32,6 +32,7 @@ interface ITwitterPuppets {
 export class Twitter {
 	private puppets: ITwitterPuppets = {};
 	private webhook: any = null;
+	private sentEventIds: string[] = [];
 	constructor(
 		private puppet: PuppetBridge,
 	) {
@@ -40,10 +41,16 @@ export class Twitter {
 	}
 
 	public getSendParams(puppetId: number, msg: any, msgCont: any) {
+		const p = this.puppets[puppetId];
+		let roomId = msgCont.sender_id;
+		if (roomId === p.data.id) {
+			roomId = msgCont.target.recipient_id;
+		}
 		return {
 			chan: {
 				puppetId,
-				roomId: msgCont.sender_id,
+				roomId,
+				isDirect: true,
 			},
 			user: {
 				puppetId,
@@ -62,8 +69,8 @@ export class Twitter {
 		const client = new Twit({
 			consumer_key: Config().twitter.consumerKey,
 			consumer_secret: Config().twitter.consumerSecret,
-			access_token: Config().twitter.accessToken,
-			access_token_secret: Config().twitter.accessTokenSecret,
+			access_token: data.accessToken,
+			access_token_secret: data.accessTokenSecret,
 		});
 		this.puppets[puppetId] = {
 			client,
@@ -113,8 +120,15 @@ export class Twitter {
 			});
 		}
 		userActivity.on("direct_message", async (dm) => {
+			if (this.sentEventIds.includes(dm.id)) {
+				// we sent this element, please dedupe
+				const ix = this.sentEventIds.indexOf(dm.id);
+				this.sentEventIds.splice(ix, 1);
+				return;
+			}
 			switch (dm.type) {
 				case "message_create": {
+					log.silly(dm);
 					const params = this.getSendParams(puppetId, dm, dm.message_create);
 					const text = dm.message_create.message_data.text;
 					await this.puppet.sendMessage(params, {
@@ -143,6 +157,53 @@ export class Twitter {
 			accessTokenSecret: p.data.accessTokenSecret,
 		});
 		delete this.puppet[puppetId];
+	}
+
+	public async handleMatrixMessage(room: IRemoteChan, data: IMessageEvent, event: any) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		log.verbose("Got message to send on");
+		// room.roomId, data.body
+		const reply = await p.client.postAsync("direct_messages/events/new", {
+			event: {
+				type: "message_create",
+				message_create: {
+					target: {
+						recipient_id: room.roomId,
+					},
+					message_data: {
+						text: data.body,
+					},
+				},
+			},
+		});
+		if (reply && reply.event && reply.event.id) {
+			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, reply.event.id);
+			this.sentEventIds.push(reply.event.id);
+		}
+	}
+
+	public async createUser(user: IRemoteUser): Promise<IRemoteUser | null> {
+		const p = this.puppets[user.puppetId];
+		if (!p) {
+			return null;
+		}
+		log.verbose(`Got request to create user ${user.userId}`);
+		try {
+			const twitterUser = await p.client.getAsync("users/show", { user_id: user.userId });
+			return {
+				userId: user.userId,
+				puppetId: user.puppetId,
+				name: twitterUser.name,
+				avatarUrl: twitterUser.profile_image_url_https,
+			};
+		} catch (err) {
+			log.error("Failed to get user");
+			log.error(err);
+			return null;
+		}
 	}
 
 	private async addWebhook() {

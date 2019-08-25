@@ -12,6 +12,7 @@ import { Twitter } from "./twitter";
 import { TwitterConfigWrap } from "./config";
 import * as fs from "fs";
 import * as yaml from "js-yaml";
+import { getOAuthUrl, initOAuth, getOAuthToken } from "./oauth";
 
 const log = new Log("TwitterPuppet:index");
 
@@ -44,8 +45,7 @@ if (options.help) {
 }
 
 const features = {
-	image: true,
-	file: true,
+	
 } as IPuppetBridgeFeatures;
 
 const puppet = new PuppetBridge(options["registration-file"], options.config, features);
@@ -80,10 +80,38 @@ export function Config(): TwitterConfigWrap {
 async function run() {
 	await puppet.init();
 	readConfig();
+	initOAuth();
 	const twitter = new Twitter(puppet);
 	puppet.on("puppetNew", twitter.newPuppet.bind(twitter));
 	puppet.on("puppetDelete", twitter.deletePuppet.bind(twitter));
-	
+	puppet.on("message", twitter.handleMatrixMessage.bind(twitter));
+	puppet.setCreateUserHook(twitter.createUser.bind(twitter));
+	puppet.setGetDastaFromStrHook(async (str: string): Promise<IRetData> => {
+		const auth = await getOAuthUrl();
+		return {
+			success: false,
+			error: `Please sign in via the following URL ${auth.url} and then send in here the pin displayed.`,
+			fn: async (pin: string): Promise<IRetData> => {
+				const retData = {
+					success: false,
+				} as IRetData;
+				try {
+					const token = await getOAuthToken(pin, auth);
+					retData.success = true;
+					retData.data = {
+						accessToken: token.access_token,
+						accessTokenSecret: token.access_token_secret,
+					};
+					return retData;
+				} catch (err) {
+					retData.success = false;
+					retData.error = `Failed to fetch tokens: ${err.data}`;
+					return retData;
+				}
+				return retData;
+			},
+		};
+	});
 	await puppet.start();
 }
 
