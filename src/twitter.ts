@@ -92,7 +92,6 @@ export class Twitter {
 		};
 
 		const auth = await client.getAsync("account/verify_credentials");
-		log.silly(auth);
 		data.screenName = auth.screen_name;
 		data.id = auth.id_str;
 		data.name = auth.name;
@@ -175,6 +174,79 @@ export class Twitter {
 					},
 					message_data: {
 						text: data.body,
+					},
+				},
+			},
+		});
+		if (reply && reply.event && reply.event.id) {
+			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, reply.event.id);
+			this.sentEventIds.push(reply.event.id);
+		}
+	}
+
+	public async uploadFileToTwitter(p: ITwitterPuppet, data: IFileEvent, category: string): Promise<string> {
+		log.silly("Downloading image....");
+		const buffer = await Util.DownloadFile(data.url);
+		let fileSize = buffer.byteLength
+		const mediaUpload = await p.client.postAsync("media/upload", {
+			command: "INIT",
+			total_bytes: fileSize,
+			media_type: data.info!.mimetype,
+			media_category: category,
+		});
+		log.silly(mediaUpload);
+		log.silly(fileSize);
+		const mediaId = mediaUpload.media_id_string;
+		let segmentIndex = 0;
+		let sizeSent = 0;
+		while (sizeSent < fileSize) {
+			const FIVE_MB = 5*1024*1024;
+			let bufferSend = Buffer.alloc(FIVE_MB);
+			buffer.copy(bufferSend, 0, sizeSent, sizeSent + FIVE_MB);
+			if (sizeSent + FIVE_MB > fileSize) {
+				bufferSend = bufferSend.slice(0, fileSize - sizeSent);
+			}
+			await p.client.postAsync("media/upload", {
+				command: "APPEND",
+				media_id: mediaId,
+				media: bufferSend.toString("base64"),
+				segment_index: segmentIndex,
+			});
+			segmentIndex++;
+			sizeSent += FIVE_MB;
+		}
+		log.silly("done uploading");
+		await p.client.postAsync("media/upload", {
+			command: "FINALIZE",
+			media_id: mediaId,
+		});
+		log.silly("done finalizing");
+		return mediaId;
+	}
+
+	public async handleMatrixImage(room: IRemoteChan, data: IFileEvent, event: any) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		log.verbose("Got image to send on");
+		const mediaId = await this.uploadFileToTwitter(p, data, data.info!.mimetype!.includes("gif") ? "dm_gif" : "dm_image");
+		log.silly(mediaId);
+		const reply = await p.client.postAsync("direct_messages/events/new", {
+			event: {
+				type: "message_create",
+				message_create: {
+					target: {
+						recipient_id: room.roomId,
+					},
+					message_data: {
+						text: "",
+						attachment: {
+							type: "media",
+							media: {
+								id: mediaId,
+							},
+						},
 					},
 				},
 			},

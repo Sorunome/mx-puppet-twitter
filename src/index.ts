@@ -45,7 +45,7 @@ if (options.help) {
 }
 
 const features = {
-	
+	image: true,
 } as IPuppetBridgeFeatures;
 
 const puppet = new PuppetBridge(options["registration-file"], options.config, features);
@@ -85,6 +85,7 @@ async function run() {
 	puppet.on("puppetNew", twitter.newPuppet.bind(twitter));
 	puppet.on("puppetDelete", twitter.deletePuppet.bind(twitter));
 	puppet.on("message", twitter.handleMatrixMessage.bind(twitter));
+	puppet.on("image", twitter.handleMatrixImage.bind(twitter));
 	puppet.setCreateUserHook(twitter.createUser.bind(twitter));
 	puppet.setGetDastaFromStrHook(async (str: string): Promise<IRetData> => {
 		const auth = await getOAuthUrl();
