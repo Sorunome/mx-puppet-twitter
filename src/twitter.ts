@@ -178,7 +178,7 @@ export class Twitter {
 					const media = messageData.attachment.media;
 					noMsg = ` ${media.url}`;
 					const url = media.media_url_https;
-					const buffer = await getOAuthPage(url, {
+					const buffer = await getOAuthFile(url, {
 						access_token: p.data.accessToken,
 						access_token_secret: p.data.accessTokenSecret,
 					});
