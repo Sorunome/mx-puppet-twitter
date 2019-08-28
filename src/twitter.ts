@@ -121,6 +121,7 @@ export class Twitter {
 		userActivity.on("direct_message", async (dm) => {
 			if (this.sentEventIds.includes(dm.id)) {
 				// we sent this element, please dedupe
+				log.silly("dropping event...");
 				const ix = this.sentEventIds.indexOf(dm.id);
 				this.sentEventIds.splice(ix, 1);
 				return;
@@ -158,6 +159,35 @@ export class Twitter {
 		delete this.puppet[puppetId];
 	}
 
+	public async sendMessageToTwitter(p: ITwitterPuppet, room: IRemoteChan, eventId: string, msg: string, mediaId?: string) {
+		const event = {
+			type: "message_create",
+			message_create: {
+				target: {
+					recipient_id: room.roomId,
+				},
+				message_data: {
+					text: msg,
+				},
+			},
+		} as any;
+		if (mediaId) {
+			event.message_create.message_data.attachment = {
+				type: "media",
+				media: {
+					id: mediaId,
+				},
+			};
+		}
+		const reply = await p.client.postAsync("direct_messages/events/new", {
+			event,
+		});
+		if (reply && reply.event && reply.event.id) {
+			await this.puppet.eventStore.insert(room.puppetId, eventId, reply.event.id);
+			this.sentEventIds.push(reply.event.id);
+		}
+	}
+
 	public async handleMatrixMessage(room: IRemoteChan, data: IMessageEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
@@ -165,23 +195,7 @@ export class Twitter {
 		}
 		log.verbose("Got message to send on");
 		// room.roomId, data.body
-		const reply = await p.client.postAsync("direct_messages/events/new", {
-			event: {
-				type: "message_create",
-				message_create: {
-					target: {
-						recipient_id: room.roomId,
-					},
-					message_data: {
-						text: data.body,
-					},
-				},
-			},
-		});
-		if (reply && reply.event && reply.event.id) {
-			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, reply.event.id);
-			this.sentEventIds.push(reply.event.id);
-		}
+		await this.sendMessageToTwitter(p, room, data.eventId!, data.body);
 	}
 
 	public async uploadFileToTwitter(p: ITwitterPuppet, data: IFileEvent, category: string): Promise<string> {
@@ -230,30 +244,30 @@ export class Twitter {
 			return;
 		}
 		log.verbose("Got image to send on");
-		const mediaId = await this.uploadFileToTwitter(p, data, data.info!.mimetype!.includes("gif") ? "dm_gif" : "dm_image");
-		log.silly(mediaId);
-		const reply = await p.client.postAsync("direct_messages/events/new", {
-			event: {
-				type: "message_create",
-				message_create: {
-					target: {
-						recipient_id: room.roomId,
-					},
-					message_data: {
-						text: "",
-						attachment: {
-							type: "media",
-							media: {
-								id: mediaId,
-							},
-						},
-					},
-				},
-			},
-		});
-		if (reply && reply.event && reply.event.id) {
-			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, reply.event.id);
-			this.sentEventIds.push(reply.event.id);
+		try {
+			const mediaId = await this.uploadFileToTwitter(p, data, data.info!.mimetype!.includes("gif") ? "dm_gif" : "dm_image");
+			log.silly(mediaId);
+			await this.sendMessageToTwitter(p, room, data.eventId!, "", mediaId);
+		} catch (err) {
+			log.error("Error sending image", err);
+			log.error(err.twitterReply);
+			await this.sendMessageToTwitter(p, room, data.eventId!, `Sent a new image: ${data.url}`);
+		}
+	}
+
+	public async handleMatrixVideo(room: IRemoteChan, data: IFileEvent, event: any) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		log.verbose("Got video to send on");
+		try {
+			const mediaId = await this.uploadFileToTwitter(p, data, "dm_video");
+			log.silly(mediaId);
+			await this.sendMessageToTwitter(p, room, data.eventId!, "", mediaId);
+		} catch (err) {
+			log.error("Error sending image", err);
+			await this.sendMessageToTwitter(p, room, data.eventId!, `Sent a new video: ${data.url}`);
 		}
 	}
 
@@ -293,10 +307,23 @@ export class Twitter {
 			app,
 		});
 		
+		const oldWebhooks = await this.webhook.getWebhooks();
+		for (const env of oldWebhooks.environments) {
+			for (const hook of env.webhooks) {
+				const id = hook.id;
+				try {
+					await this.webhook.unregister({
+						webhookId: id,
+					});
+				} catch (err) {
+					log.error("Failed to un-register old webhook", err);
+				}
+			}
+		}
 		try {
 			await this.webhook.register();
 		} catch (err) {
-			log.error(err);
+			log.error("Failed to register new webhook", err);
 		}
 	}
 }
