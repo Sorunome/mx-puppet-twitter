@@ -15,6 +15,7 @@ import * as bodyParser from "body-parser";
 import * as twitterWebhooks from "twitter-webhooks";
 import * as http from "http";
 import { Config } from "./index";
+import { getOAuthPage } from "./oauth";
 
 const log = new Log("TwitterPuppet:Twitter");
 
@@ -61,6 +62,18 @@ export class Twitter {
 	}
 
 	public async newPuppet(puppetId: number, data: any) {
+		/*
+		try {
+			const img = await getOAuthPage("https://ton.twitter.com/i/ton/data/dm/1166760156362940422/1166760141968031746/_3FjBvCO.jpg", {
+				access_token: data.accessToken,
+				access_token_secret: data.accessTokenSecret,
+			});
+			log.silly(img);
+		} catch (err) {
+			log.error("Error getting image", err);
+		}
+		return;
+		*/
 		await this.addWebhook();
 		log.info(`Adding new Puppet: puppetId=${puppetId}`);
 		if (this.puppets[puppetId]) {
@@ -121,19 +134,13 @@ export class Twitter {
 		userActivity.on("direct_message", async (dm) => {
 			if (this.sentEventIds.includes(dm.id)) {
 				// we sent this element, please dedupe
-				log.silly("dropping event...");
 				const ix = this.sentEventIds.indexOf(dm.id);
 				this.sentEventIds.splice(ix, 1);
 				return;
 			}
 			switch (dm.type) {
 				case "message_create": {
-					log.silly(dm);
-					const params = this.getSendParams(puppetId, dm, dm.message_create);
-					const text = dm.message_create.message_data.text;
-					await this.puppet.sendMessage(params, {
-						body: text,
-					});
+					await this.handleTwitterMessage(puppetId, dm);
 					break;
 				}
 				default: {
@@ -147,7 +154,7 @@ export class Twitter {
 
 	public async deletePuppet(puppetId: number) {
 		log.info(`Got signal to quit Puppet: puppetId=${puppetId}`);
-		const p = this.puppet[puppetId];
+		const p = this.puppets[puppetId];
 		if (!p) {
 			return; // nothing to do
 		}
@@ -157,6 +164,38 @@ export class Twitter {
 			accessTokenSecret: p.data.accessTokenSecret,
 		});
 		delete this.puppet[puppetId];
+	}
+
+	public async handleTwitterMessage(puppetId: number, dm: any) {
+		const p = this.puppets[puppetId];
+		const messageData = dm.message_create.message_data;
+		const params = this.getSendParams(puppetId, dm, dm.message_create);
+		let noMsg = "";
+		if (messageData.attachment) {
+			log.silly(messageData);
+			switch (messageData.attachment.type) {
+				case "media": {
+					const media = messageData.attachment.media;
+					noMsg = ` ${media.url}`;
+					const url = media.media_url_https;
+					const buffer = await getOAuthPage(url, {
+						access_token: p.data.accessToken,
+						access_token_secret: p.data.accessTokenSecret,
+					});
+					await this.puppet.sendFileDetect(params, buffer);
+					break;
+				}
+				default: {
+					log.silly("unknown attachment type", messageData);
+				}
+			}
+		}
+		const text = dm.message_create.message_data.text;
+		if (noMsg && text !== noMsg) {
+			await this.puppet.sendMessage(params, {
+				body: text,
+			});
+		}
 	}
 
 	public async sendMessageToTwitter(p: ITwitterPuppet, room: IRemoteChan, eventId: string, msg: string, mediaId?: string) {

@@ -1,4 +1,4 @@
-import { Log } from "mx-puppet-bridge";
+import { Log, Util } from "mx-puppet-bridge";
 import { OAuth } from "oauth";
 import { Config } from "./index";
 
@@ -63,5 +63,14 @@ export async function getOAuthToken(pin: string, data: any): Promise<IOAuthToken
 				access_token_secret,
 			});
 		});
+	});
+}
+
+export async function getOAuthPage(url: string, token: IOAuthToken): Promise<any> {
+	const orderedParameters = oauth._prepareParameters(token.access_token, token.access_token_secret, "GET", url, null);
+	const headers = {} as {[name: string]: string};
+	headers.Authorization = oauth._buildAuthorizationHeaders(orderedParameters);
+	return await Util.DownloadFile(url, {
+		headers,
 	});
 }
