@@ -15,7 +15,7 @@ import * as bodyParser from "body-parser";
 import * as twitterWebhooks from "twitter-webhooks";
 import * as http from "http";
 import { Config } from "./index";
-import { getOAuthPage } from "./oauth";
+import { getOAuthFile } from "./oauth";
 
 const log = new Log("TwitterPuppet:Twitter");
 
@@ -33,7 +33,7 @@ interface ITwitterPuppets {
 export class Twitter {
 	private puppets: ITwitterPuppets = {};
 	private webhook: any = null;
-	private sentEventIds: string[] = [];
+	private sentEventIds: any = {};
 	constructor(
 		private puppet: PuppetBridge,
 	) {
@@ -62,18 +62,6 @@ export class Twitter {
 	}
 
 	public async newPuppet(puppetId: number, data: any) {
-		/*
-		try {
-			const img = await getOAuthPage("https://ton.twitter.com/i/ton/data/dm/1166760156362940422/1166760141968031746/_3FjBvCO.jpg", {
-				access_token: data.accessToken,
-				access_token_secret: data.accessTokenSecret,
-			});
-			log.silly(img);
-		} catch (err) {
-			log.error("Error getting image", err);
-		}
-		return;
-		*/
 		await this.addWebhook();
 		log.info(`Adding new Puppet: puppetId=${puppetId}`);
 		if (this.puppets[puppetId]) {
@@ -103,53 +91,52 @@ export class Twitter {
 				});
 			});
 		};
-
-		const auth = await client.getAsync("account/verify_credentials");
-		data.screenName = auth.screen_name;
-		data.id = auth.id_str;
-		data.name = auth.name;
-		await this.puppet.setUserId(puppetId, data.id);
-		await this.puppet.setPuppetData(puppetId, data);
-
-		let userActivity;
 		try {
-			userActivity = await this.webhook.subscribe({
+			const auth = await client.getAsync("account/verify_credentials");
+			data.screenName = auth.screen_name;
+			data.id = auth.id_str;
+			data.name = auth.name;
+			await this.puppet.setUserId(puppetId, data.id);
+			await this.puppet.setPuppetData(puppetId, data);
+
+			let userActivity;
+			const userActivityOptions = {
 				userId: data.id,
 				accessToken: data.accessToken,
 				accessTokenSecret: data.accessTokenSecret,
+			};
+			try {
+				userActivity = await this.webhook.subscribe(userActivityOptions);
+			} catch (err) {
+				// if it is already subscribed we just need to re-subscribe to get the real object
+				log.warning("Failed to subscribe to user, retrying...", err);
+				await this.webhook.unsubscribe(userActivityOptions);
+				userActivity = await this.webhook.subscribe(userActivityOptions);
+			}
+			userActivity.on("direct_message", async (dm) => {
+				if (this.sentEventIds[data.id] && this.sentEventIds[data.id].includes(dm.id)) {
+					// we sent this element, please dedupe
+					log.silly("Dropping message due to dedupe");
+					const ix = this.sentEventIds[data.id].indexOf(dm.id);
+					this.sentEventIds[data.id].splice(ix, 1);
+					return;
+				}
+				switch (dm.type) {
+					case "message_create": {
+						await this.handleTwitterMessage(puppetId, dm);
+						break;
+					}
+					default: {
+						log.silly("Unknown message type");
+						log.silly(dm);
+					}
+				}
 			});
+			await this.puppet.sendStatusMessage(puppetId, "connected!");
 		} catch (err) {
-			// if it is already subscribed we just need to re-subscribe to get the real object
-			await this.webhook.unsubscribe({
-				userId: data.id,
-				accessToken: data.accessToken,
-				accessTokenSecret: data.accessTokenSecret,
-			});
-			userActivity = await this.webhook.subscribe({
-				userId: data.id,
-				accessToken: data.accessToken,
-				accessTokenSecret: data.accessTokenSecret,
-			});
+			log.error(`Failed to start up puppet ${puppetId}`, err);
+			await this.puppet.sendStatusMessage(puppetId, `**disconnected!**: failed to connect. ${err}`);
 		}
-		userActivity.on("direct_message", async (dm) => {
-			if (this.sentEventIds.includes(dm.id)) {
-				// we sent this element, please dedupe
-				const ix = this.sentEventIds.indexOf(dm.id);
-				this.sentEventIds.splice(ix, 1);
-				return;
-			}
-			switch (dm.type) {
-				case "message_create": {
-					await this.handleTwitterMessage(puppetId, dm);
-					break;
-				}
-				default: {
-					log.silly("Unknown message type");
-					log.silly(dm);
-				}
-			}
-		});
-		await this.puppet.sendStatusMessage(puppetId, "connected!");
 	}
 
 	public async deletePuppet(puppetId: number) {
@@ -168,6 +155,7 @@ export class Twitter {
 
 	public async handleTwitterMessage(puppetId: number, dm: any) {
 		const p = this.puppets[puppetId];
+		log.verbose("Got message from twitter to pass on");
 		const messageData = dm.message_create.message_data;
 		const params = this.getSendParams(puppetId, dm, dm.message_create);
 		let noMsg = "";
@@ -191,7 +179,7 @@ export class Twitter {
 			}
 		}
 		const text = dm.message_create.message_data.text;
-		if (noMsg && text !== noMsg) {
+		if (!(noMsg && text === noMsg)) {
 			await this.puppet.sendMessage(params, {
 				body: text,
 			});
@@ -223,7 +211,10 @@ export class Twitter {
 		});
 		if (reply && reply.event && reply.event.id) {
 			await this.puppet.eventStore.insert(room.puppetId, eventId, reply.event.id);
-			this.sentEventIds.push(reply.event.id);
+			if (!this.sentEventIds[p.data.id]) {
+				this.sentEventIds[p.data.id] = [];
+			}
+			this.sentEventIds[p.data.id].push(reply.event.id);
 		}
 	}
 
