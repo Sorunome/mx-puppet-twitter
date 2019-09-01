@@ -83,6 +83,7 @@ async function run() {
 	readConfig();
 	initOAuth();
 	const twitter = new Twitter(puppet);
+	await twitter.addWebhook();
 	puppet.on("puppetNew", twitter.newPuppet.bind(twitter));
 	puppet.on("puppetDelete", twitter.deletePuppet.bind(twitter));
 	puppet.on("message", twitter.handleMatrixMessage.bind(twitter));

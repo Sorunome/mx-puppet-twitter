@@ -24,6 +24,8 @@ const app = express();
 interface ITwitterPuppet {
 	client: Twit,
 	data: any,
+	sentEventIds: string[],
+	typingUsers: {[key: string]: any},
 }
 
 interface ITwitterPuppets {
@@ -33,7 +35,6 @@ interface ITwitterPuppets {
 export class Twitter {
 	private puppets: ITwitterPuppets = {};
 	private webhook: any = null;
-	private sentEventIds: any = {};
 	constructor(
 		private puppet: PuppetBridge,
 	) {
@@ -62,7 +63,6 @@ export class Twitter {
 	}
 
 	public async newPuppet(puppetId: number, data: any) {
-		await this.addWebhook();
 		log.info(`Adding new Puppet: puppetId=${puppetId}`);
 		if (this.puppets[puppetId]) {
 			await this.deletePuppet(puppetId);
@@ -76,7 +76,10 @@ export class Twitter {
 		this.puppets[puppetId] = {
 			client,
 			data,
+			sentEventIds: [],
+			typingUsers: {},
 		} as ITwitterPuppet;
+		const p = this.puppets[puppetId];
 		client.getAsync = (...args) => {
 			return new Promise((resolve, reject) => {
 				client.get(...args, (err, data) => {
@@ -114,11 +117,11 @@ export class Twitter {
 				userActivity = await this.webhook.subscribe(userActivityOptions);
 			}
 			userActivity.on("direct_message", async (dm) => {
-				if (this.sentEventIds[data.id] && this.sentEventIds[data.id].includes(dm.id)) {
+				if (p.sentEventIds.includes(dm.id)) {
 					// we sent this element, please dedupe
 					log.silly("Dropping message due to dedupe");
-					const ix = this.sentEventIds[data.id].indexOf(dm.id);
-					this.sentEventIds[data.id].splice(ix, 1);
+					const ix = p.sentEventIds.indexOf(dm.id);
+					p.sentEventIds.splice(ix, 1);
 					return;
 				}
 				switch (dm.type) {
@@ -131,6 +134,9 @@ export class Twitter {
 						log.silly(dm);
 					}
 				}
+			});
+			userActivity.on("direct_message_indicate_typing", async (typing) => {
+				await this.handleTwitterTyping(puppetId, typing);
 			});
 			await this.puppet.sendStatusMessage(puppetId, "connected!");
 		} catch (err) {
@@ -153,11 +159,25 @@ export class Twitter {
 		delete this.puppet[puppetId];
 	}
 
+	public async handleTwitterTyping(puppetId: number, typing: any) {
+		const p = this.puppets[puppetId];
+		const params = this.getSendParams(puppetId, typing, typing);
+		const typingKey = `${params.user.userId};${params.chan.roomId}`;
+		p.typingUsers[typingKey] = params;
+		await this.puppet.setUserTyping(params, true);
+	}
+
 	public async handleTwitterMessage(puppetId: number, dm: any) {
 		const p = this.puppets[puppetId];
 		log.verbose("Got message from twitter to pass on");
 		const messageData = dm.message_create.message_data;
 		const params = this.getSendParams(puppetId, dm, dm.message_create);
+		const typingKey = `${params.user.userId};${params.chan.roomId}`;
+		if (p.typingUsers[typingKey]) {
+			// user is typing, stop that
+			await this.puppet.setUserTyping(p.typingUsers[typingKey], false);
+			delete p.typingUsers[typingKey];
+		}
 		let noMsg = "";
 		if (messageData.attachment) {
 			log.silly(messageData);
@@ -211,10 +231,7 @@ export class Twitter {
 		});
 		if (reply && reply.event && reply.event.id) {
 			await this.puppet.eventStore.insert(room.puppetId, eventId, reply.event.id);
-			if (!this.sentEventIds[p.data.id]) {
-				this.sentEventIds[p.data.id] = [];
-			}
-			this.sentEventIds[p.data.id].push(reply.event.id);
+			p.sentEventIds.push(reply.event.id);
 		}
 	}
 
@@ -322,7 +339,7 @@ export class Twitter {
 		}
 	}
 
-	private async addWebhook() {
+	public async addWebhook() {
 		if (this.webhook) {
 			return;
 		}
