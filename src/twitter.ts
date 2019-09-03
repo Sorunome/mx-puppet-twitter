@@ -138,6 +138,12 @@ export class Twitter {
 			userActivity.on("direct_message_indicate_typing", async (typing) => {
 				await this.handleTwitterTyping(puppetId, typing);
 			});
+			userActivity.on("direct_message_mark_read", async (read) => {
+				await this.handleTwitterRead(puppetId, read);
+			})
+			userActivity.on("users", async (users) => {
+				await this.handleTwitterUsers(puppetId, users);
+			});
 			await this.puppet.sendStatusMessage(puppetId, "connected!");
 		} catch (err) {
 			log.error(`Failed to start up puppet ${puppetId}`, err);
@@ -159,7 +165,37 @@ export class Twitter {
 		delete this.puppet[puppetId];
 	}
 
+	public async handleTwitterUsers(puppetId: number, users: any) {
+		for (const uid in users) {
+			if (users.hasOwnProperty(uid)) {
+				const user = users[uid];
+				const remoteUser = {
+					userId: user.id,
+					puppetId,
+					name: user.screen_name || user.name,
+					avatarUrl: user.profile_image_url_https,
+				} as IRemoteUser;
+				await this.puppet.updateUser(remoteUser);
+			}
+		}
+	}
+
+	public async handleTwitterRead(puppetId: number, read: any) {
+		log.verbose("Received read indicator...");
+		const params = this.getSendParams(puppetId, read, read);
+		params.eventId = read.last_read_event_id;
+		await this.puppet.sendReadReceipt(params);
+		log.silly(read);
+/*
+Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '1567334383202',
+  sender_id: '2654844554',
+  target: { recipient_id: '1168106388494721025' },
+  last_read_event_id: '1168111139147911172' }
+*/
+	}
+
 	public async handleTwitterTyping(puppetId: number, typing: any) {
+		log.verbose("Received typing request...");
 		const p = this.puppets[puppetId];
 		const params = this.getSendParams(puppetId, typing, typing);
 		const typingKey = `${params.user.userId};${params.chan.roomId}`;
@@ -329,7 +365,7 @@ export class Twitter {
 			return {
 				userId: user.userId,
 				puppetId: user.puppetId,
-				name: twitterUser.name,
+				name: twitterUser.screen_name || twitterUser.name,
 				avatarUrl: twitterUser.profile_image_url_https,
 			};
 		} catch (err) {
