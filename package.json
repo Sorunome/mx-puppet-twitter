@@ -17,7 +17,7 @@
     "escape-html": "^1.0.3",
     "express": "^4.17.1",
     "js-yaml": "^3.13.1",
-    "mx-puppet-bridge": "^0.0.12",
+    "mx-puppet-bridge": "^0.0.13",
     "oauth": "^0.9.15",
     "tslint": "^5.17.0",
     "twit": "^2.2.11",

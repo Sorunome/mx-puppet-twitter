@@ -90,6 +90,16 @@ async function run() {
 	puppet.on("image", twitter.handleMatrixImage.bind(twitter));
 	puppet.on("video", twitter.handleMatrixVideo.bind(twitter));
 	puppet.setCreateUserHook(twitter.createUser.bind(twitter));
+	puppet.setGetDescHook(async (puppetId: number, data: any): Promise<string> => {
+		let s = "Twitter";
+		if (data.screenName) {
+			s += ` as ${data.screenName}`;
+		}
+		if (data.name) {
+			s += ` (${data.name})`;
+		}
+		return s;
+	});
 	puppet.setGetDastaFromStrHook(async (str: string): Promise<IRetData> => {
 		const auth = await getOAuthUrl();
 		return {
