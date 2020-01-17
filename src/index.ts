@@ -1,6 +1,6 @@
 import {
 	PuppetBridge,
-	IPuppetBridgeFeatures,
+	IProtocolInformation,
 	IPuppetBridgeRegOpts,
 	Log,
 	IRetData,
@@ -44,12 +44,17 @@ if (options.help) {
 	process.exit(0);
 }
 
-const features = {
-	image: true,
-	video: true,
-} as IPuppetBridgeFeatures;
+const protocol = {
+	features: {
+		image: true,
+		video: true,
+	},
+	id: "twitter",
+	displayname: "Twitter",
+	externalUrl: "https://twitter.com/",
+} as IProtocolInformation;
 
-const puppet = new PuppetBridge(options["registration-file"], options.config, features);
+const puppet = new PuppetBridge(options["registration-file"], options.config, protocol);
 
 if (options.register) {
 	// okay, all we have to do is generate a registration file
