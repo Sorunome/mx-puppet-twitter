@@ -1,0 +1,39 @@
+bridge:
+  # Port to host the bridge on which your homeserver will connect to
+  port: 6000
+  # Address for the bridge to bind to; if running as a Docker container, you
+  # probably want 0.0.0.0 here
+  bindAddress: localhost
+  # Name of your homeserver
+  domain: matrix.myhomeserver.com
+  # URL where the bridge can connect to your homeserver
+  homeserverUrl: http://localhost:8008
+
+provisioning:
+  # Which users are allowed to issue commands to @_twitterpuppet_bot
+  whitelist:
+    - "@username:matrix\\.myhomeserver\\.com"
+  # A blacklist can be used instead:
+  # blacklist:
+  #   - "@username:matrix\\.myhomeserver\\.com"
+
+twitter:
+  # You will need to set up a Twitter application with all permissions and add
+  # its credentials and environment here
+  # Set up your app here: https://developer.twitter.com/en/apps
+  consumerKey: ""
+  consumerSecret: ""
+  accessToken: ""
+  accessTokenSecret: ""
+  environment: ""
+  server:
+    # The bridge uses Twitter's webhooks API. For this to work, you need a
+    # publically accessible URL with SSL on port 443; Twitter will refuse to
+    # send webhooks to any other port. You will likely want to configure a
+    # reverse proxy such as Nginx to handle this
+    url: https://twitter-bridge.myhomeserver.com
+    # Port for the webhooks listener to bind to
+    port: 6001
+    # Address for the webhooks listener to bind to; if running as a Docker
+    # container, you probably want 0.0.0.0 here
+    host: localhost
