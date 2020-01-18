@@ -2,7 +2,7 @@ import {
 	PuppetBridge,
 	Log,
 	IReceiveParams,
-	IRemoteChan,
+	IRemoteRoom,
 	IRemoteUser,
 	IMessageEvent,
 	IFileEvent,
@@ -42,14 +42,14 @@ export class Twitter {
 		app.listen(Config().twitter.server.port, Config().twitter.server.host);
 	}
 
-	public getSendParams(puppetId: number, msg: any, msgCont: any) {
+	public getSendParams(puppetId: number, msg: any, msgCont: any): IReceiveParams {
 		const p = this.puppets[puppetId];
 		let roomId = msgCont.sender_id;
 		if (roomId === p.data.id) {
 			roomId = msgCont.target.recipient_id;
 		}
 		return {
-			chan: {
+			room: {
 				puppetId,
 				roomId,
 				isDirect: true,
@@ -198,7 +198,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		log.verbose("Received typing request...");
 		const p = this.puppets[puppetId];
 		const params = this.getSendParams(puppetId, typing, typing);
-		const typingKey = `${params.user.userId};${params.chan.roomId}`;
+		const typingKey = `${params.user.userId};${params.room.roomId}`;
 		p.typingUsers[typingKey] = params;
 		await this.puppet.setUserTyping(params, true);
 	}
@@ -208,7 +208,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		log.verbose("Got message from twitter to pass on");
 		const messageData = dm.message_create.message_data;
 		const params = this.getSendParams(puppetId, dm, dm.message_create);
-		const typingKey = `${params.user.userId};${params.chan.roomId}`;
+		const typingKey = `${params.user.userId};${params.room.roomId}`;
 		if (p.typingUsers[typingKey]) {
 			// user is typing, stop that
 			await this.puppet.setUserTyping(p.typingUsers[typingKey], false);
@@ -242,7 +242,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		}
 	}
 
-	public async sendMessageToTwitter(p: ITwitterPuppet, room: IRemoteChan, eventId: string, msg: string, mediaId?: string) {
+	public async sendMessageToTwitter(p: ITwitterPuppet, room: IRemoteRoom, eventId: string, msg: string, mediaId?: string) {
 		const event = {
 			type: "message_create",
 			message_create: {
@@ -271,7 +271,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		}
 	}
 
-	public async handleMatrixMessage(room: IRemoteChan, data: IMessageEvent, event: any) {
+	public async handleMatrixMessage(room: IRemoteRoom, data: IMessageEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -321,7 +321,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		return mediaId;
 	}
 
-	public async handleMatrixImage(room: IRemoteChan, data: IFileEvent, event: any) {
+	public async handleMatrixImage(room: IRemoteRoom, data: IFileEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -338,7 +338,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		}
 	}
 
-	public async handleMatrixVideo(room: IRemoteChan, data: IFileEvent, event: any) {
+	public async handleMatrixVideo(room: IRemoteRoom, data: IFileEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
