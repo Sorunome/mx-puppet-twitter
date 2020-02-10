@@ -15,9 +15,9 @@ You will need to create a Twitter developer account and a Twitter app, which can
 
 Copy the `sample.config.yaml` to `config.yaml` and edit it appropriately. The sample config includes some sensible defaults and comments describing each option.
 
-Run `node ./src`. This will generate a `twitter-registration.yaml` file. Edit that file as needed. In particular, the `url` option needs to be set to a URL where the bridge can communicate with your homeserver. Copy this file to your Synapse homeserver.
+Run `node ./src/index.js`. This will generate a `twitter-registration.yaml` file. Edit that file as needed. In particular, the `url` option needs to be set to a URL where the bridge can communicate with your homeserver. Copy this file to your Synapse homeserver.
 
-Run `node ./src` again to start the bridge. (If you encounter errors here, it is likely because Twitter is unable to reach the webhooks server, or because the bridge is unable to reach your homeserver.)
+Run `node ./src/index.js` again to start the bridge. (If you encounter errors here, it is likely because Twitter is unable to reach the webhooks server, or because the bridge is unable to reach your homeserver.)
 
 On your Synapse homeserver, edit your `homeserver.yaml`'s `app_service_config_files` to include the path to the `twitter-registration.yaml`, then restart your Synapse server.
 
