@@ -17,6 +17,12 @@ provisioning:
   # blacklist:
   #   - "@username:matrix\\.myhomeserver\\.com"
 
+  # Shared secret for the provisioning API for use by integration managers.
+  # If this is not set, the provisioning API will not be enabled.
+  #sharedSecret: random string
+  # Path prefix for the provisioning API. /v1 will be appended to the prefix automatically.
+  apiPrefix: /_matrix/provision
+
 twitter:
   # You will need to set up a Twitter application with all permissions and add
   # its credentials and environment here

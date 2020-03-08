@@ -25,21 +25,21 @@ export function initOAuth() {
 		Config().twitter.consumerKey,
 		Config().twitter.consumerSecret,
 		"1.0A",
-		"oob",
-		"HMAC-SHA1"
+		null,
+		"HMAC-SHA1",
 	);
 }
 
-export async function getOAuthUrl(): Promise<IOAuthData> {
+export async function getOAuthUrl(callback: string = "oob"): Promise<IOAuthData> {
 	return new Promise((resolve, reject) => {
 		oauth.getOAuthRequestToken(
-			{"x_auth_access_type": "dm"},
-			(error, oAuthToken, oAuthTokenSecret) => {
+			{x_auth_access_type: "dm", oauth_callback: callback},
+			(error, oAuthToken, oAuthTokenSecret, dat) => {
 				if (error) {
 					return reject(error);
 				}
 				const authURL = "https://twitter.com/oauth/authorize?oauth_token=" + oAuthToken;
-				var data = {
+				const data = {
 					oauth_token: oAuthToken,
 					oauth_secret: oAuthTokenSecret,
 					url: authURL,

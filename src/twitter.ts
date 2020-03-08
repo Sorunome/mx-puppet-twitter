@@ -16,6 +16,7 @@ import * as twitterWebhooks from "twitter-webhooks";
 import * as http from "http";
 import { Config } from "./index";
 import { getOAuthFile } from "./oauth";
+import { TwitterProvisioningAPI } from "./api";
 
 const log = new Log("TwitterPuppet:Twitter");
 
@@ -35,11 +36,13 @@ interface ITwitterPuppets {
 export class Twitter {
 	private puppets: ITwitterPuppets = {};
 	private webhook: any = null;
+	private provisioningAPI: TwitterProvisioningAPI;
 	constructor(
 		private puppet: PuppetBridge,
 	) {
 		app.use(bodyParser.json());
 		app.listen(Config().twitter.server.port, Config().twitter.server.host);
+		this.provisioningAPI = new TwitterProvisioningAPI(puppet);
 	}
 
 	public getSendParams(puppetId: number, msg: any, msgCont: any): IReceiveParams {
@@ -389,7 +392,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 			environment: Config().twitter.environment,
 			app,
 		});
-		
+
 		const oldWebhooks = await this.webhook.getWebhooks();
 		for (const env of oldWebhooks.environments) {
 			for (const hook of env.webhooks) {
