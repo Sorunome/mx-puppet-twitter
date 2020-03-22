@@ -20,10 +20,10 @@ import { TwitterProvisioningAPI } from "./api";
 const log = new Log("TwitterPuppet:Twitter");
 
 interface ITwitterPuppet {
-	client: Twit,
-	data: any,
-	sentEventIds: string[],
-	typingUsers: {[key: string]: any},
+	client: Twit;
+	data: any;
+	sentEventIds: string[];
+	typingUsers: {[key: string]: any};
 }
 
 interface ITwitterPuppets {
@@ -78,17 +78,17 @@ export class Twitter {
 			typingUsers: {},
 		} as ITwitterPuppet;
 		const p = this.puppets[puppetId];
-		client.getAsync = (...args) => {
+		client.getAsync = async (...args) => {
 			return new Promise((resolve, reject) => {
-				client.get(...args, (err, data) => {
-					err ? reject(err) : resolve(data);
+				client.get(...args, (err, d) => {
+					err ? reject(err) : resolve(d);
 				});
 			});
 		};
-		client.postAsync = (...args) => {
+		client.postAsync = async (...args) => {
 			return new Promise((resolve, reject) => {
-				client.post(...args, (err, data) => {
-					err ? reject(err) : resolve(data);
+				client.post(...args, (err, d) => {
+					err ? reject(err) : resolve(d);
 				});
 			});
 		};
@@ -138,7 +138,7 @@ export class Twitter {
 			});
 			userActivity.on("direct_message_mark_read", async (read) => {
 				await this.handleTwitterRead(puppetId, read);
-			})
+			});
 			userActivity.on("users", async (users) => {
 				await this.handleTwitterUsers(puppetId, users);
 			});
@@ -240,7 +240,13 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		}
 	}
 
-	public async sendMessageToTwitter(p: ITwitterPuppet, room: IRemoteRoom, eventId: string, msg: string, mediaId?: string) {
+	public async sendMessageToTwitter(
+		p: ITwitterPuppet,
+		room: IRemoteRoom,
+		eventId: string,
+		msg: string,
+		mediaId?: string,
+	) {
 		const event = {
 			type: "message_create",
 			message_create: {
@@ -282,7 +288,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 	public async uploadFileToTwitter(p: ITwitterPuppet, data: IFileEvent, category: string): Promise<string> {
 		log.silly("Downloading image....");
 		const buffer = await Util.DownloadFile(data.url);
-		let fileSize = buffer.byteLength
+		const fileSize = buffer.byteLength;
 		const mediaUpload = await p.client.postAsync("media/upload", {
 			command: "INIT",
 			total_bytes: fileSize,
@@ -295,7 +301,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		let segmentIndex = 0;
 		let sizeSent = 0;
 		while (sizeSent < fileSize) {
-			const FIVE_MB = 5*1024*1024;
+			const FIVE_MB = 5 * 1024 * 1024; // tslint:disable-line no-magic-numbers
 			let bufferSend = Buffer.alloc(FIVE_MB);
 			buffer.copy(bufferSend, 0, sizeSent, sizeSent + FIVE_MB);
 			if (sizeSent + FIVE_MB > fileSize) {
@@ -326,7 +332,8 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		}
 		log.verbose("Got image to send on");
 		try {
-			const mediaId = await this.uploadFileToTwitter(p, data, data.info!.mimetype!.includes("gif") ? "dm_gif" : "dm_image");
+			const mediaId = await this.uploadFileToTwitter(
+				p, data, data.info!.mimetype!.includes("gif") ? "dm_gif" : "dm_image");
 			log.silly(mediaId);
 			await this.sendMessageToTwitter(p, room, data.eventId!, "", mediaId);
 		} catch (err) {

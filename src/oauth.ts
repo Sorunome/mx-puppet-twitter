@@ -6,6 +6,8 @@ const log = new Log("TwitterPuppet:oauth");
 
 // oauth stuffs in part from https://github.com/Half-Shot/matrix-appservice-twitter/blob/master/src/AccountServices.js
 
+// tslint:disable variable-name
+
 export interface IOAuthData {
 	oauth_token: string;
 	oauth_secret: string;
@@ -47,7 +49,7 @@ export async function getOAuthUrl(callback: string = "oob"): Promise<IOAuthData>
 				resolve(data);
 			},
 		);
-	})
+	});
 }
 
 export async function getOAuthToken(pin: string, data: any): Promise<IOAuthToken> {
