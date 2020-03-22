@@ -22,7 +22,6 @@ class TwitterConfig {
 }
 
 class TwitterServerConfig {
-	public url: "";
-	public host: "localhost";
-	public port: 4567;
+	public url: string = "";
+	public path: string = "/webhook";
 }

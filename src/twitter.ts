@@ -10,7 +10,6 @@ import {
 	IRetList,
 } from "mx-puppet-bridge";
 import * as Twit from "twit";
-import * as express from "express";
 import * as bodyParser from "body-parser";
 import * as twitterWebhooks from "twitter-webhooks";
 import * as http from "http";
@@ -19,8 +18,6 @@ import { getOAuthFile } from "./oauth";
 import { TwitterProvisioningAPI } from "./api";
 
 const log = new Log("TwitterPuppet:Twitter");
-
-const app = express();
 
 interface ITwitterPuppet {
 	client: Twit,
@@ -40,8 +37,6 @@ export class Twitter {
 	constructor(
 		private puppet: PuppetBridge,
 	) {
-		app.use(bodyParser.json());
-		app.listen(Config().twitter.server.port, Config().twitter.server.host);
 		this.provisioningAPI = new TwitterProvisioningAPI(puppet);
 	}
 
@@ -382,15 +377,16 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		if (this.webhook) {
 			return;
 		}
+		this.puppet.AS.expressAppInstance.use(Config().twitter.server.path, bodyParser.json());
 		this.webhook = twitterWebhooks.userActivity({
 			serverUrl: Config().twitter.server.url,
-			route: "/webhook",
+			route: Config().twitter.server.path,
 			consumerKey: Config().twitter.consumerKey,
 			consumerSecret: Config().twitter.consumerSecret,
 			accessToken: Config().twitter.accessToken,
 			accessTokenSecret: Config().twitter.accessTokenSecret,
 			environment: Config().twitter.environment,
-			app,
+			app: this.puppet.AS.expressAppInstance,
 		});
 
 		const oldWebhooks = await this.webhook.getWebhooks();
