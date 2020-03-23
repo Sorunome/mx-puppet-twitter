@@ -88,7 +88,6 @@ async function run() {
 	readConfig();
 	initOAuth();
 	const twitter = new Twitter(puppet);
-	await twitter.addWebhook();
 	puppet.on("puppetNew", twitter.newPuppet.bind(twitter));
 	puppet.on("puppetDelete", twitter.deletePuppet.bind(twitter));
 	puppet.on("message", twitter.handleMatrixMessage.bind(twitter));
@@ -131,7 +130,7 @@ async function run() {
 			},
 		};
 	});
-	await puppet.start();
+	await puppet.start(twitter.addWebhook.bind(twitter));
 }
 
 // tslint:disable-next-line:no-floating-promises

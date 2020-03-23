@@ -410,7 +410,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 			}
 		}
 		try {
-			await this.webhook.register();
+			await this.webhook.regiser();
 		} catch (err) {
 			log.error("Failed to register new webhook", err);
 		}
