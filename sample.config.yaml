@@ -38,8 +38,5 @@ twitter:
     # send webhooks to any other port. You will likely want to configure a
     # reverse proxy such as Nginx to handle this
     url: https://twitter-bridge.myhomeserver.com
-    # Port for the webhooks listener to bind to
-    port: 6001
-    # Address for the webhooks listener to bind to; if running as a Docker
-    # container, you probably want 0.0.0.0 here
-    host: localhost
+    # The path that the nginx proxy will have to redirect
+    path: /_matrix/twitter/webhook
