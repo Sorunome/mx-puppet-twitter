@@ -270,7 +270,7 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 			event,
 		});
 		if (reply && reply.event && reply.event.id) {
-			await this.puppet.eventStore.insert(room.puppetId, eventId, reply.event.id);
+			await this.puppet.eventSync.insert(room, eventId, reply.event.id);
 			p.sentEventIds.push(reply.event.id);
 		}
 	}
