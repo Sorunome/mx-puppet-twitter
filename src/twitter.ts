@@ -23,7 +23,6 @@ interface ITwitterPuppet {
 	client: Twit;
 	data: any;
 	sentEventIds: string[];
-	typingUsers: {[key: string]: any};
 }
 
 interface ITwitterPuppets {
@@ -75,7 +74,6 @@ export class Twitter {
 			client,
 			data,
 			sentEventIds: [],
-			typingUsers: {},
 		} as ITwitterPuppet;
 		const p = this.puppets[puppetId];
 		client.getAsync = async (...args) => {
@@ -197,7 +195,6 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		const p = this.puppets[puppetId];
 		const params = this.getSendParams(puppetId, typing, typing);
 		const typingKey = `${params.user.userId};${params.room.roomId}`;
-		p.typingUsers[typingKey] = params;
 		await this.puppet.setUserTyping(params, true);
 	}
 
@@ -207,11 +204,6 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 		const messageData = dm.message_create.message_data;
 		const params = this.getSendParams(puppetId, dm, dm.message_create);
 		const typingKey = `${params.user.userId};${params.room.roomId}`;
-		if (p.typingUsers[typingKey]) {
-			// user is typing, stop that
-			await this.puppet.setUserTyping(p.typingUsers[typingKey], false);
-			delete p.typingUsers[typingKey];
-		}
 		let noMsg = "";
 		if (messageData.attachment) {
 			log.silly(messageData);
