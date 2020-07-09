@@ -18,6 +18,7 @@ class TwitterConfig {
 	public accessToken = "";
 	public accessTokenSecret = "";
 	public environment = "";
+	public appId = 0;
 	public server: TwitterServerConfig = new TwitterServerConfig();
 }
 

@@ -32,11 +32,14 @@ interface ITwitterPuppets {
 export class Twitter {
 	private puppets: ITwitterPuppets = {};
 	private webhook: any = null;
+	private ourAppId: string | null = null;
 	private provisioningAPI: TwitterProvisioningAPI;
 	constructor(
 		private puppet: PuppetBridge,
 	) {
 		this.provisioningAPI = new TwitterProvisioningAPI(puppet);
+		const appId = Config().twitter.appId;
+		this.ourAppId = appId ? appId.toString() : null;
 	}
 
 	public getSendParams(puppetId: number, msg: any, msgCont: any): IReceiveParams {
@@ -116,6 +119,10 @@ export class Twitter {
 				if (p.sentEventIds.includes(dm.id)) {
 					// we sent this element, please dedupe
 					log.silly("Dropping message due to dedupe");
+					if (!this.ourAppId && dm?.message_create?.source_app_id) {
+						this.ourAppId = dm.message_create.source_app_id;
+						log.silly("Our app ID wasn't set in config, but found", this.ourAppId, "via deduped message");
+					}
 					const ix = p.sentEventIds.indexOf(dm.id);
 					p.sentEventIds.splice(ix, 1);
 					return;
@@ -200,6 +207,11 @@ Sep-1 12:39:43.696 [TwitterPuppet:Twitter] silly: { created_timestamp: '15673343
 
 	public async handleTwitterMessage(puppetId: number, dm: any) {
 		const p = this.puppets[puppetId];
+		if (dm.message_create.source_app_id === this.ourAppId
+			&& dm.message_create.sender_id === p.data.id) {
+			log.silly("Dropping message", dm.id, "as it was sent from our app ID");
+			return;
+		}
 		log.verbose("Got message from twitter to pass on");
 		const messageData = dm.message_create.message_data;
 		const params = this.getSendParams(puppetId, dm, dm.message_create);
