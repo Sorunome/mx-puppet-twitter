@@ -32,6 +32,8 @@ twitter:
   accessToken: ""
   accessTokenSecret: ""
   environment: ""
+  # The twitter app ID (https://developer.twitter.com/en/apps/<app id>) used for message deduplication
+  appId: 0
   server:
     # The bridge uses Twitter's webhooks API. For this to work, you need a
     # publically accessible URL with SSL on port 443; Twitter will refuse to
