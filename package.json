@@ -16,7 +16,7 @@
     "command-line-usage": "^5.0.5",
     "escape-html": "^1.0.3",
     "js-yaml": "^3.13.1",
-    "mx-puppet-bridge": "^0.0.39",
+    "mx-puppet-bridge": "^0.1.4",
     "oauth": "^0.9.15",
     "tslint": "^5.20.1",
     "twit": "^2.2.11",

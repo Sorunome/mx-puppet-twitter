@@ -74,5 +74,6 @@ export async function getOAuthFile(url: string, token: IOAuthToken): Promise<any
 	headers.Authorization = oauth._buildAuthorizationHeaders(orderedParameters);
 	return await Util.DownloadFile(url, {
 		headers,
+		responseType: "buffer",
 	});
 }
